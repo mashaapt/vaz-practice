@@ -286,12 +286,11 @@ async function firstChoice() {
         switch (v) {
             case 'View  all products':
                 return pickFilter(v);
-        }
+            }
         return v;
     }
 
 }
-
 async function chooseFilters() {
 
     const categoryAnswer = await select({
