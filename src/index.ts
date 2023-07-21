@@ -1,24 +1,9 @@
-import { Types } from 'mongoose';
 import { Subject } from 'rxjs';
-import { types } from 'util';
-import { select, input } from '@inquirer/prompts';
-// import { list } from '@inquirer/lib/prompts';
-import { Separator } from '@inquirer/prompts';
+import { select, input, confirm } from '@inquirer/prompts';
+import * as chalk from 'chalk';
+import * as clear from 'clear';
+import * as figlet from 'figlet';
 
-import {
-    createPrompt,
-    useState,
-    useKeypress,
-    usePrefix,
-    isEnterKey,
-    isBackspaceKey,
-    AsyncPromptConfig,
-} from '@inquirer/core';
-import type { } from '@inquirer/type';
-import { filter } from 'lodash';
-//   import chalk from 'chalk';
-//   import clear from 'clear';
-//   import figlet from 'figlet';
 
 
 //   type InputConfig = AsyncPromptConfig & {
@@ -93,11 +78,6 @@ import { filter } from 'lodash';
 //     return [`${prefix} ${message}${defaultStr} ${formattedValue}`, error];
 //   });
 
-const chalk = require('chalk');
-const clear = require('clear');
-const figlet = require('figlet');
-const inquirer = require('inquirer');
-const list = require('list');
 
 const TYPES = ['Pastel', 'Crystal', 'Metallic', 'Chrome'] as const;
 type Type = typeof TYPES[number];
@@ -170,7 +150,8 @@ class Product {
         public productType: Type,
         public productMaker: Maker,
         public productColor: Color,
-        public category: CategoryFeat) { }
+        public category: CategoryFeat,
+        public subcategory: SubCatFeat) { }
 }
 
 class Header {
@@ -201,6 +182,12 @@ class Category {
         public subcategories: Category[] = []) { }
 }
 
+
+interface Filter {
+    property: string;
+    value: string;
+}
+
 // class SubCategory {
 //     // subCategory: SubCatFeat;
 //     constructor(public name: SubCatFeat,
@@ -229,13 +216,13 @@ const sidebar = new SideBar(
 
 
 const products = [
-    new Product('Animals', 12, true, 'Pastel', 'Gemar', 'purple', 'Latex'),
-    new Product('HB', 14, true, 'Chrome', 'China', 'purple', 'Latex'),
-    new Product('Elephants', 10, false, 'Pastel', 'Qualatex', 'gold', 'Latex'),
-    new Product('Pink', 11, true, 'Pastel', 'Gemar', 'pink', 'Latex'),
-    new Product('Couple', 12, false, 'Crystal', 'China', 'fuxia', 'Foil'),
-    new Product('Rave', 14, true, 'Metallic', 'China', 'silver', 'Foil'),
-    new Product('Infant', 10, false, 'Pastel', 'Qualatex', 'purple', 'Foil')
+    new Product('Animals', 12, true, 'Pastel', 'Gemar', 'purple', 'Latex', 'with print'),
+    new Product('HB', 14, true, 'Chrome', 'China', 'purple', 'Latex', 'without print'),
+    new Product('Elephants', 10, false, 'Pastel', 'Qualatex', 'gold', 'Latex', 'with print'),
+    new Product('Pink', 11, true, 'Pastel', 'Gemar', 'pink', 'Latex', 'with print'),
+    new Product('Couple', 12, false, 'Crystal', 'China', 'fuxia', 'Foil', 'without print'),
+    new Product('Rave', 14, true, 'Metallic', 'China', 'silver', 'Foil', 'without print'),
+    new Product('Infant', 10, false, 'Pastel', 'Qualatex', 'purple', 'Foil', 'with print')
 ];
 
 // let category1 = Category.name
@@ -258,8 +245,6 @@ const categories = [
 
 
 async function startTerminal() {
-
-
     clear();
 
     console.log(
@@ -267,30 +252,138 @@ async function startTerminal() {
             figlet.textSync('Shop Shar', { horizontalLayout: 'full' })
         ))
 
-    firstChoice();
+    while (true) {
+        await firstChoice();
 
-    // chooseFilters();
+        const shouldCont = await confirm({
+            message: 'Would you like to restart the programm?'
+        })
 
-}
-async function firstChoice() {
-
-    const firstOpts = await select({
-        message: 'What do you want to do?',
-        choices: [
-            { value: 'View  all products' },
-            { value: 'Search product' },
-            { value: 'Add product' }
-        ]
-    });
-    function choicess(v) {
-        switch (v) {
-            case 'View  all products':
-                return pickFilter(v);
-            }
-        return v;
+        if(!shouldCont) {
+            break;
+        }
+    
     }
 
+
 }
+
+// type FirstOptions = 'ViewAll' | 'Search' | 'AddProduct';
+enum FirstOptions {
+    ViewAll,
+    Search,
+    AddProduct
+}
+
+enum SearchOption {
+    ByText,
+    ByCategory
+}
+
+async function firstChoice() {
+
+    const firstSelection = await select({
+        message: 'What do you want to do?',
+        choices: [
+            { name: 'View  all products', value: FirstOptions.ViewAll },
+            { name: 'Search product', value: FirstOptions.Search },
+            { name: 'Add product', value: FirstOptions.AddProduct }
+        ]
+    });
+
+    switch (firstSelection) {
+        case FirstOptions.ViewAll:
+            return viewAllProducts();
+        case FirstOptions.Search:
+            return chooseSearchType();
+        case FirstOptions.AddProduct:
+            return addProduct();
+    }
+
+    function viewAllProducts() {
+        console.table(products);
+    }
+
+    async function chooseSearchType() {
+
+        const searchSelection = await select({
+            message: 'What do you want to do?',
+            choices: [
+                { name: 'Search by text', value: SearchOption.ByText },
+                { name: 'Search by categories', value: SearchOption.ByCategory },
+
+            ]
+        });
+
+        switch (searchSelection) {
+            case SearchOption.ByText:
+                return searchByName();
+            case SearchOption.ByCategory:
+                return searchByCategory();
+        }
+
+
+        async function searchByName() {
+
+            const textInput = await input({
+                message: 'Type name of the product'
+            })
+
+            const filteredProducts = products.filter(product => product.name.toLowerCase().includes(textInput.toLowerCase()));
+            console.table(filteredProducts);
+        }
+
+        async function searchByCategory() {
+            const filters = await chooseFilters();
+            
+            console.table(filterProducts(filters))
+        }
+
+    }
+
+    function filterProducts(filters: Filter[]) {
+        return products.filter(product =>
+            product.category === getFilter(filters, 'category') &&
+            product.subcategory === getFilter(filters, 'subcategory') &&
+            product.productType === getFilter(filters, 'Type') &&
+            product.productMaker === getFilter(filters, 'Maker') &&
+            product.productColor === getFilter(filters, 'Color')
+        )
+    }
+
+    function getFilter(filters: Filter[], property: string) {
+        return filters.find(filter => filter.property === property)?.value;
+    }
+
+    async function addProduct() {
+        const filters = await chooseFilters();
+        const name = '';
+        const price = 0;
+        const isAvaliable = true;
+
+        const product = new Product(
+            name, 
+            price, 
+            isAvaliable, 
+            getFilter(filters, 'Type') as Type,
+            getFilter(filters, 'Maker') as Maker,
+            getFilter(filters, 'Color') as Color,
+            getFilter(filters, 'category') as CategoryFeat,
+            getFilter(filters, 'subcategory') as SubCatFeat,
+        );
+
+
+        products.push(product);
+        
+        console.log('Added product!')
+        console.table(product);
+
+
+    }
+}
+
+
+
 async function chooseFilters() {
 
     const categoryAnswer = await select({
@@ -326,11 +419,13 @@ async function chooseFilters() {
 
     console.log('Picked filters', { filter1, filter2, filter3 });
 
-    console.table(products.filter(product =>
-        product.productType === filter1 &&
-        product.productMaker === filter2 &&
-        product.productColor === filter3
-    ))
+    return [
+        { property: 'category', value: categoryAnswer.name },
+        { property: 'subcategory', value: subcategoryAnswer.name },
+        filter1, 
+        filter2, 
+        filter3 
+    ]
 
 }
 
@@ -338,13 +433,15 @@ async function chooseFilters() {
 function getFilterOptions(filter: string) {
     switch (filter) {
         case 'Type':
-            return TYPES.map(type => ({ value: type })) as any;
+            return TYPES.map(type => ({ value: type as string }));
 
         case 'Maker':
-            return MAKERS.map(maker => ({ value: maker })) as any;
+            return MAKERS.map(maker => ({ value: maker as string }));
 
         case 'Color':
-            return COLORS.map(color => ({ value: color })) as any;
+            return COLORS.map(color => ({ value: color as string }));
+
+        default: return [];
     }
 }
 
@@ -370,7 +467,11 @@ async function pickFilter(alreadySelected: string[]) {
         choices: getFilterOptions(picked)
     })
 
-    return answer;
+    return {
+        property: picked,
+        value: answer
+    } as Filter;
 }
+
 
 startTerminal();
